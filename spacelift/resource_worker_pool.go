@@ -53,7 +53,7 @@ func resourceWorkerPool() *schema.Resource {
 				Optional:    true,
 				Computed:    true,
 				Sensitive:   true,
-				ForceNew:    true,
+				ForceNew:    false,
 			},
 			"description": {
 				Type:        schema.TypeString,
@@ -241,6 +241,21 @@ func resourceWorkerPoolUpdate(ctx context.Context, d *schema.ResourceData, meta 
 
 	if err := meta.(*internal.Client).Mutate(ctx, "WorkerPoolUpdate", &mutation, variables); err != nil {
 		ret = diag.Errorf("could not update worker pool: %v", internal.FromSpaceliftError(err))
+	}
+
+	if desc, ok := d.GetOk("csr"); ok {
+		var mutation_reset struct {
+			WorkerPool structs.WorkerPool `graphql:"workerPoolReset(id: $id, certificateSigningRequest: $csr)"`
+		}
+
+		variables_reset := map[string]interface{}{
+			"id":  toID(d.Id()),
+			"csr": graphql.String(desc.(string)),
+		}
+
+		if err := meta.(*internal.Client).Mutate(ctx, "WorkerPoolReset", &mutation_reset, variables_reset); err != nil {
+			ret = diag.Errorf("could not reset worker pool: %v", internal.FromSpaceliftError(err))
+		}
 	}
 
 	return append(ret, resourceWorkerPoolRead(ctx, d, meta)...)
